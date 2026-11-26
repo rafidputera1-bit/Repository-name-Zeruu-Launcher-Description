@@ -12,6 +12,9 @@ jobs:
         run: |
           if [ ! -f app/build.gradle.kts ]; then
             unzip -o "$(ls *.zip | head -n1)"
+            if [ -f zeruu-launcher/app/build.gradle.kts ]; then
+              cp -a zeruu-launcher/. .
+            fi
           fi
           test -f app/build.gradle.kts
       - uses: actions/setup-java@v4
@@ -33,4 +36,5 @@ jobs:
           name: zeruu-launcher-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+        
           
