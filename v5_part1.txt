@@ -1,0 +1,503 @@
+--- START OF FILE build.gradle.kts ---
+plugins {
+    id("com.android.application") version "8.6.1" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+}
+--- START OF FILE settings.gradle.kts ---
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "ZeruuLauncher"
+include(":app")
+--- START OF FILE gradle.properties ---
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+org.gradle.caching=true
+android.useAndroidX=true
+android.nonTransitiveRClass=true
+kotlin.code.style=official
+--- START OF FILE gradle/wrapper/gradle-wrapper.properties ---
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+--- START OF FILE app/build.gradle.kts ---
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.zeruu.launcher"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.zeruu.launcher"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 5
+        versionName = "0.5.0"
+    }
+
+    signingConfigs {
+        create("zeruu") {
+            storeFile = file("zeruu.keystore")
+            storePassword = "zeruu123"
+            keyAlias = "zeruu"
+            keyPassword = "zeruu123"
+        }
+    }
+
+    buildTypes {
+        debug {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = if (file("zeruu.keystore").exists()) signingConfigs.getByName("zeruu") else signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = if (file("zeruu.keystore").exists()) signingConfigs.getByName("zeruu") else signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.activity:activity-compose:1.9.2")
+
+    implementation(platform("androidx.compose:compose-bom:2024.09.02"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+}
+--- START OF FILE app/proguard-rules.pro ---
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}
+-dontwarn org.xmlpull.v1.**
+--- START OF FILE app/src/main/AndroidManifest.xml ---
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Zeruu Launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ZeruuLauncher">
+
+        <activity
+            android:name=".MainActivity"
+            android:clearTaskOnLaunch="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:windowSoftInputMode="adjustNothing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>
+--- START OF FILE app/src/main/res/values/themes.xml ---
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZeruuLauncher" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
+--- START OF FILE app/src/main/java/com/zeruu/launcher/data/AppInfo.kt ---
+package com.zeruu.launcher.data
+
+import android.content.ComponentName
+import androidx.compose.runtime.Immutable
+
+@Immutable
+data class AppInfo(
+    val label: String,
+    val componentName: ComponentName
+) {
+    val packageName: String get() = componentName.packageName
+    val key: String get() = componentName.flattenToString()
+}
+--- START OF FILE app/src/main/java/com/zeruu/launcher/data/HomeItem.kt ---
+package com.zeruu.launcher.data
+
+import androidx.compose.runtime.Immutable
+import java.util.UUID
+
+@Immutable
+sealed interface HomeItem {
+    val id: String
+    val page: Int
+    val col: Int
+    val row: Int
+    val spanX: Int
+    val spanY: Int
+
+    fun moveTo(page: Int, col: Int, row: Int): HomeItem
+    fun resizeTo(spanX: Int, spanY: Int): HomeItem
+
+    @Immutable
+    data class AppShortcut(
+        override val id: String = UUID.randomUUID().toString(),
+        val componentKey: String,
+        override val page: Int,
+        override val col: Int,
+        override val row: Int,
+        override val spanX: Int = 1,
+        override val spanY: Int = 1
+    ) : HomeItem {
+        override fun moveTo(page: Int, col: Int, row: Int) = copy(page = page, col = col, row = row)
+        override fun resizeTo(spanX: Int, spanY: Int) = copy(spanX = spanX, spanY = spanY)
+    }
+
+    @Immutable
+    data class Folder(
+        override val id: String = UUID.randomUUID().toString(),
+        val title: String = "Folder",
+        val appKeys: List<String>,
+        override val page: Int,
+        override val col: Int,
+        override val row: Int,
+        override val spanX: Int = 1,
+        override val spanY: Int = 1
+    ) : HomeItem {
+        override fun moveTo(page: Int, col: Int, row: Int) = copy(page = page, col = col, row = row)
+        override fun resizeTo(spanX: Int, spanY: Int) = copy(spanX = spanX, spanY = spanY)
+    }
+
+    @Immutable
+    data class Widget(
+        override val id: String = UUID.randomUUID().toString(),
+        val appWidgetId: Int,
+        val providerPackage: String,
+        val providerClass: String,
+        override val page: Int,
+        override val col: Int,
+        override val row: Int,
+        override val spanX: Int = 2,
+        override val spanY: Int = 2
+    ) : HomeItem {
+        override fun moveTo(page: Int, col: Int, row: Int) = copy(page = page, col = col, row = row)
+        override fun resizeTo(spanX: Int, spanY: Int) = copy(spanX = spanX, spanY = spanY)
+    }
+}
+--- START OF FILE app/src/main/java/com/zeruu/launcher/data/ZeruuSettings.kt ---
+package com.zeruu.launcher.data
+
+data class ZeruuSettings(
+    val themeMode: Int = 2,
+    val accent: Long = 0xFFD9B24C,
+    val scrim: Float = 0.18f,
+    val glassBlurRadius: Float = 26f,
+
+    val homeWallpaperMode: Int = 1,
+    val lockWallpaperMode: Int = 1,
+    val lockDepthEffect: Boolean = true,
+
+    val fluxLayout: Int = 0,
+    val clockStyle: Int = 3,
+    val clockColor: Long = 0xFFFFFFFF,
+    val clockGlow: Boolean = false,
+    val clockDotSeparator: Boolean = true,
+    val clockGlass: Boolean = true,
+    val clockGlassLevel: Float = 0.55f,
+    val clockFormat: Int = 0,
+    val showDate: Boolean = true,
+    val lockInfoPill: Int = 1,
+    val lockClockSize: Float = 132f,
+    val lockX: Float = 0.5f,
+    val lockY: Float = 0.14f,
+    val showBattery: Boolean = true,
+    val lockWidgets: String = "battery,storage,note",
+    val lockNoteText: String = "Zeruu Flux v0.5.0",
+    val lockShortcutsEnabled: Boolean = true,
+
+    val homeClockEnabled: Boolean = true,
+    val homeClockSize: Float = 58f,
+    val homeClockAlign: Int = 0,
+    val homePages: Int = 3,
+    val gridColumns: Int = 4,
+    val gridRows: Int = 6,
+    val iconSize: Float = 56f,
+    val iconShape: Int = 2,
+    val iconTheme: Int = 0,
+    val iconPackPackage: String = "",
+    val showLabels: Boolean = true,
+    val labelSize: Float = 11f,
+
+    val dockEnabled: Boolean = true,
+    val dockCount: Int = 4,
+    val dockAlpha: Float = 0.20f,
+    val dockRadius: Float = 32f,
+    val dockGlass: Boolean = true,
+    val dockGlassLevel: Float = 0.72f,
+
+    val animSpeed: Float = 1f,
+    val animBounce: Float = 0.45f,
+    val staggerIcons: Boolean = true,
+    val systemUnlockAnim: Boolean = true,
+
+    val aboutBgMode: Int = 0
+)
+--- START OF FILE app/src/main/java/com/zeruu/launcher/data/SettingsRepository.kt ---
+package com.zeruu.launcher.data
+
+import android.content.Context
+
+class SettingsRepository(context: Context) {
+
+    private val prefs = context.applicationContext
+        .getSharedPreferences("zeruu_settings_v5", Context.MODE_PRIVATE)
+
+    fun load(): ZeruuSettings {
+        val d = ZeruuSettings()
+        return ZeruuSettings(
+            themeMode = prefs.getInt("themeMode", d.themeMode),
+            accent = prefs.getLong("accent", d.accent),
+            scrim = prefs.getFloat("scrim", d.scrim),
+            glassBlurRadius = prefs.getFloat("glassBlurRadius", d.glassBlurRadius),
+            homeWallpaperMode = prefs.getInt("homeWallpaperMode", d.homeWallpaperMode),
+            lockWallpaperMode = prefs.getInt("lockWallpaperMode", d.lockWallpaperMode),
+            lockDepthEffect = prefs.getBoolean("lockDepthEffect", d.lockDepthEffect),
+
+            fluxLayout = prefs.getInt("fluxLayout", d.fluxLayout),
+            clockStyle = prefs.getInt("clockStyle", d.clockStyle),
+            clockColor = prefs.getLong("clockColor", d.clockColor),
+            clockGlow = prefs.getBoolean("clockGlow", d.clockGlow),
+            clockDotSeparator = prefs.getBoolean("clockDotSeparator", d.clockDotSeparator),
+            clockGlass = prefs.getBoolean("clockGlass", d.clockGlass),
+            clockGlassLevel = prefs.getFloat("clockGlassLevel", d.clockGlassLevel),
+            clockFormat = prefs.getInt("clockFormat", d.clockFormat),
+            showDate = prefs.getBoolean("showDate", d.showDate),
+            lockInfoPill = prefs.getInt("lockInfoPill", d.lockInfoPill),
+            lockClockSize = prefs.getFloat("lockClockSize", d.lockClockSize),
+            lockX = prefs.getFloat("lockX", d.lockX),
+            lockY = prefs.getFloat("lockY", d.lockY),
+            showBattery = prefs.getBoolean("showBattery", d.showBattery),
+            lockWidgets = prefs.getString("lockWidgets", d.lockWidgets) ?: d.lockWidgets,
+            lockNoteText = prefs.getString("lockNoteText", d.lockNoteText) ?: d.lockNoteText,
+            lockShortcutsEnabled = prefs.getBoolean("lockShortcutsEnabled", d.lockShortcutsEnabled),
+
+            homeClockEnabled = prefs.getBoolean("homeClockEnabled", d.homeClockEnabled),
+            homeClockSize = prefs.getFloat("homeClockSize", d.homeClockSize),
+            homeClockAlign = prefs.getInt("homeClockAlign", d.homeClockAlign),
+            homePages = prefs.getInt("homePages", d.homePages),
+            gridColumns = prefs.getInt("gridColumns", d.gridColumns),
+            gridRows = prefs.getInt("gridRows", d.gridRows),
+            iconSize = prefs.getFloat("iconSize", d.iconSize),
+            iconShape = prefs.getInt("iconShape", d.iconShape),
+            iconTheme = prefs.getInt("iconTheme", d.iconTheme),
+            iconPackPackage = prefs.getString("iconPackPackage", d.iconPackPackage) ?: d.iconPackPackage,
+            showLabels = prefs.getBoolean("showLabels", d.showLabels),
+            labelSize = prefs.getFloat("labelSize", d.labelSize),
+
+            dockEnabled = prefs.getBoolean("dockEnabled", d.dockEnabled),
+            dockCount = prefs.getInt("dockCount", d.dockCount),
+            dockAlpha = prefs.getFloat("dockAlpha", d.dockAlpha),
+            dockRadius = prefs.getFloat("dockRadius", d.dockRadius),
+            dockGlass = prefs.getBoolean("dockGlass", d.dockGlass),
+            dockGlassLevel = prefs.getFloat("dockGlassLevel", d.dockGlassLevel),
+
+            animSpeed = prefs.getFloat("animSpeed", d.animSpeed),
+            animBounce = prefs.getFloat("animBounce", d.animBounce),
+            staggerIcons = prefs.getBoolean("staggerIcons", d.staggerIcons),
+            systemUnlockAnim = prefs.getBoolean("systemUnlockAnim", d.systemUnlockAnim),
+            aboutBgMode = prefs.getInt("aboutBgMode", d.aboutBgMode)
+        )
+    }
+
+    fun save(s: ZeruuSettings) {
+        prefs.edit()
+            .putInt("themeMode", s.themeMode)
+            .putLong("accent", s.accent)
+            .putFloat("scrim", s.scrim)
+            .putFloat("glassBlurRadius", s.glassBlurRadius)
+            .putInt("homeWallpaperMode", s.homeWallpaperMode)
+            .putInt("lockWallpaperMode", s.lockWallpaperMode)
+            .putBoolean("lockDepthEffect", s.lockDepthEffect)
+            .putInt("fluxLayout", s.fluxLayout)
+            .putInt("clockStyle", s.clockStyle)
+            .putLong("clockColor", s.clockColor)
+            .putBoolean("clockGlow", s.clockGlow)
+            .putBoolean("clockDotSeparator", s.clockDotSeparator)
+            .putBoolean("clockGlass", s.clockGlass)
+            .putFloat("clockGlassLevel", s.clockGlassLevel)
+            .putInt("clockFormat", s.clockFormat)
+            .putBoolean("showDate", s.showDate)
+            .putInt("lockInfoPill", s.lockInfoPill)
+            .putFloat("lockClockSize", s.lockClockSize)
+            .putFloat("lockX", s.lockX)
+            .putFloat("lockY", s.lockY)
+            .putBoolean("showBattery", s.showBattery)
+            .putString("lockWidgets", s.lockWidgets)
+            .putString("lockNoteText", s.lockNoteText)
+            .putBoolean("lockShortcutsEnabled", s.lockShortcutsEnabled)
+            .putBoolean("homeClockEnabled", s.homeClockEnabled)
+            .putFloat("homeClockSize", s.homeClockSize)
+            .putInt("homeClockAlign", s.homeClockAlign)
+            .putInt("homePages", s.homePages)
+            .putInt("gridColumns", s.gridColumns)
+            .putInt("gridRows", s.gridRows)
+            .putFloat("iconSize", s.iconSize)
+            .putInt("iconShape", s.iconShape)
+            .putInt("iconTheme", s.iconTheme)
+            .putString("iconPackPackage", s.iconPackPackage)
+            .putBoolean("showLabels", s.showLabels)
+            .putFloat("labelSize", s.labelSize)
+            .putBoolean("dockEnabled", s.dockEnabled)
+            .putInt("dockCount", s.dockCount)
+            .putFloat("dockAlpha", s.dockAlpha)
+            .putFloat("dockRadius", s.dockRadius)
+            .putBoolean("dockGlass", s.dockGlass)
+            .putFloat("dockGlassLevel", s.dockGlassLevel)
+            .putFloat("animSpeed", s.animSpeed)
+            .putFloat("animBounce", s.animBounce)
+            .putBoolean("staggerIcons", s.staggerIcons)
+            .putBoolean("systemUnlockAnim", s.systemUnlockAnim)
+            .putInt("aboutBgMode", s.aboutBgMode)
+            .apply()
+    }
+}
+--- START OF FILE app/src/main/java/com/zeruu/launcher/data/HomeLayoutRepository.kt ---
+package com.zeruu.launcher.data
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+
+class HomeLayoutRepository(context: Context) {
+
+    private val prefs = context.applicationContext.getSharedPreferences("zeruu_layout_v5", Context.MODE_PRIVATE)
+    private val legacyPrefs = context.applicationContext.getSharedPreferences("zeruu_layout", Context.MODE_PRIVATE)
+
+    fun hasLayout(): Boolean = prefs.contains("items") || legacyPrefs.contains("home")
+
+    fun hasV5Layout(): Boolean = prefs.contains("items")
+
+    fun loadLegacyHome(): List<String> {
+        val s = legacyPrefs.getString("home", "") ?: ""
+        return if (s.isEmpty()) emptyList() else s.split("\n")
+    }
+
+    fun loadLegacyDock(): List<String> {
+        val s = legacyPrefs.getString("dock", "") ?: ""
+        return if (s.isEmpty()) emptyList() else s.split("\n")
+    }
+
+    fun loadDock(): List<String> {
+        val s = prefs.getString("dock", null) ?: return loadLegacyDock()
+        return if (s.isEmpty()) emptyList() else s.split("\n")
+    }
+
+    fun loadSeen(): Set<String> = prefs.getStringSet("seen", null)?.toSet()
+        ?: legacyPrefs.getStringSet("seen", emptySet())?.toSet()
+        ?: emptySet()
+
+    fun loadItems(): List<HomeItem> {
+        val raw = prefs.getString("items", null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val id = o.getString("id")
+                    val page = o.getInt("page")
+                    val col = o.getInt("col")
+                    val row = o.getInt("row")
+                    val spanX = o.optInt("spanX", 1).coerceAtLeast(1)
+                    val spanY = o.optInt("spanY", 1).coerceAtLeast(1)
+                    when (o.getString("type")) {
+                        "app" -> add(HomeItem.AppShortcut(id, o.getString("key"), page, col, row, spanX, spanY))
+                        "folder" -> {
+                            val keysArr = o.getJSONArray("keys")
+                            val keys = List(keysArr.length()) { k -> keysArr.getString(k) }
+                            add(HomeItem.Folder(id, o.optString("title", "Folder"), keys, page, col, row, spanX, spanY))
+                        }
+                        "widget" -> add(
+                            HomeItem.Widget(
+                                id, o.getInt("widgetId"), o.getString("pkg"), o.getString("cls"),
+                                page, col, row, spanX, spanY
+                            )
+                        )
+                    }
+                }
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    fun save(items: List<HomeItem>, dock: List<String>, seen: Set<String>) {
+        val arr = JSONArray()
+        items.forEach { item ->
+            val o = JSONObject()
+                .put("id", item.id)
+                .put("page", item.page)
+                .put("col", item.col)
+                .put("row", item.row)
+                .put("spanX", item.spanX)
+                .put("spanY", item.spanY)
+            when (item) {
+                is HomeItem.AppShortcut -> o.put("type", "app").put("key", item.componentKey)
+                is HomeItem.Folder -> o.put("type", "folder").put("title", item.title).put("keys", JSONArray(item.appKeys))
+                is HomeItem.Widget -> o.put("type", "widget")
+                    .put("widgetId", item.appWidgetId)
+                    .put("pkg", item.providerPackage)
+                    .put("cls", item.providerClass)
+            }
+            arr.put(o)
+        }
+        prefs.edit()
+            .putString("items", arr.toString())
+            .putString("dock", dock.joinToString("\n"))
+            .putStringSet("seen", seen)
+            .apply()
+    }
+}
+--- START OF FILE app/src/main/java/com/
